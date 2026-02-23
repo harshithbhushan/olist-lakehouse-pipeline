@@ -36,5 +36,16 @@
 - **Idempotency:** Utilized `CREATE OR REPLACE` for all DDL statements to ensure the setup scripts can be re-run safely without crashing.
 
 
-## Day 4: Programmatic Ingestion (The Bronze Layer)
-- 
+## Day 4: Programmatic Ingestion (The Bridge)
+- **Goal:** Build a secure, automated ingestion script to move raw local data to the Snowflake cloud stage.
+- **Actions:**
+    - Configured `python-dotenv` to securely inject credentials into the environment at runtime, maintaining Zero-Trust architecture.
+    - Engineered `scripts/load_bronze.py` using the `snowflake-connector-python` library.
+    - Executed Snowflake's native `PUT` command to iterate over the local `/data` directory and upload 9 raw CSV files.
+- **Why:** Manual uploads via the UI are unscalable. Programmatic ingestion via the `PUT` command allows for automatic file compression (gzip) and sets the foundation for future orchestration (Airflow).
+
+### ⚠️ Technical Challenges & Key Learnings
+- **Variable Scope and Consistency:** Encountered a `NameError` due to inconsistent variable naming (`data` vs `data_dir`). It reinforced that Python is entirely literal; variable declarations must exactly match their execution calls.
+- **Execution Guards:** Discovered the risk of duplicate `if __name__ == "__main__":` blocks. A script should only have one entry point at the absolute end of the file to prevent duplicate execution loops and memory leaks.
+- **Tooling vs. Files (`dotenv` vs `.env`):** Solidified the difference between a static file and an active tool. `.env` is just a text file acting as a safe for secrets; `python-dotenv` is the necessary "locksmith" tool Python uses to actually open it and load variables into memory securely.
+- **Identity Decoupling (Custom vs. System Roles):** Reaffirmed the "why" behind custom RBAC. We explicitly created `TRANSFORMER_ROLE` instead of using default system roles (`ACCOUNTADMIN`) to decouple the "identity that pays the bill" from the "identity that runs the pipeline," enforcing the Principle of Least Privilege and minimizing the blast radius of any potential errors. (The Principle of Least Privilege (PoLP) AND maintaining the hierarchy)
