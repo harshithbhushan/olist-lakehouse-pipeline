@@ -8,6 +8,7 @@
     - Implemented **Zero-Trust Security**: Configured `.gitignore` to protect `.env` secrets and raw datasets.
 - **Why:** Mirroring enterprise setups ensures that the transition from local development to cloud deployment is seamless.
 
+
 ## Day 2: Cloud Infrastructure & Safety Brakes
 - **Goal:** Initialize Snowflake with cost-protection and security.
 - **Actions:**
@@ -15,6 +16,7 @@
     - Created **Resource Monitor (`STUDENT_LIMIT`)**: Set a hard cap at 10 credits to prevent cost overruns.
     - Standardized warehouse settings: `OLIST_WH` (X-Small) with 60s auto-suspend.
 - **Why:** In cloud engineering, "Resource Monitoring" is a Day 1 priority to manage OpEx (Operating Expenses).
+
 
 ## Day 3: RBAC & The Landing Zone
 - **Goal:** Implement Role-Based Access Control and stage data.
@@ -50,3 +52,19 @@
 - **Tooling vs. Files (`dotenv` vs `.env`):** Solidified the difference between a static file and an active tool. `.env` is just a text file acting as a safe for secrets; `python-dotenv` is the necessary "locksmith" tool Python uses to actually open it and load variables into memory securely.
 - **Identity Decoupling (Custom vs. System Roles):** Reaffirmed the "why" behind custom RBAC. We explicitly created `TRANSFORMER_ROLE` instead of using default system roles (`ACCOUNTADMIN`) to decouple the "identity that pays the bill" from the "identity that runs the pipeline," enforcing the Principle of Least Privilege and minimizing the blast radius of any potential errors. (The Principle of Least Privilege (PoLP) AND maintaining the hierarchy)
 - **Environment Synchronization:** Discovered that VS Code's visual linter (Pylance) and the execution terminal can operate on entirely different Python interpreters. Resolved false-positive "missing import" warnings by aligning the IDE's interpreter with the active environment.
+
+
+## Day 5: Transformation Engine Foundation (dbt)
+- **Goal:** Initialize the data build tool (dbt) and securely connect it to Snowflake without hardcoding credentials.
+- **Actions:**
+    - Established a Python virtual environment (`venv`) to quarantine project dependencies and avoid system-wide version conflicts.
+    - Configured the project brain (`dbt_project.yml`) to define the Medallion materialization strategy (Bronze as views, Silver/Gold as tables).
+    - Engineered `profiles.yml` using Jinja templating `{{ env_var() }}` to dynamically inject credentials from the `.env` file at runtime.
+    - Successfully validated the connection using `dotenv run -- dbt debug`.
+
+### ⚠️ Technical Challenges & Key Learnings
+- **The YAML Whitespace Trap:** Learned that YAML files are ruthlessly strict about indentation. A single misplaced space or misaligned key will break the entire configuration.
+- **Virtual Environments & IDE Sync:** Reinforced that VS Code's terminal and its background linters/extensions can sometimes fall out of sync. Trusting the terminal prompt (`(venv)`) is the ultimate source of truth.
+- **PowerShell Encoding Traps:** Learned that using `echo > filename` in PowerShell can secretly encode files in UTF-16, which causes parsing errors in `dbt`. Adopted `New-Item` as the standard CLI method for clean file creation.
+- **Jinja Templating for Security:** Introduced Jinja syntax (`{{ env_var() }}`) within configuration files. This acts as a dynamic placeholder, allowing the pipeline to fetch secrets at runtime and immediately drop them, rather than violating Zero-Trust by hardcoding passwords.
+- **Architectural Efficiency (Direct Stage Querying):** Made an architectural decision to bypass the traditional `sources.yml` setup. Because Snowflake's engine is powerful enough to query compressed `.gz` files directly from an internal stage (`@raw_stage`), we can skip building intermediate Bronze tables entirely, optimizing both storage and compute.

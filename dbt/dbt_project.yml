@@ -1,0 +1,17 @@
+name: 'olist_lakehouse'
+version: '1.0.0'
+config-version: 2
+
+profile: 'olist_snowflake'
+
+model-paths: ["models"]
+test-paths: ["tests"]
+
+models:
+  olist_lakehouse:
+    bronze:
+      +materialized: view
+    silver:
+      +materialized: table
+    gold:
+      +materialized: table
