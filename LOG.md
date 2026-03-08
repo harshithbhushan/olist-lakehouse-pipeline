@@ -68,3 +68,19 @@
 - **PowerShell Encoding Traps:** Learned that using `echo > filename` in PowerShell can secretly encode files in UTF-16, which causes parsing errors in `dbt`. Adopted `New-Item` as the standard CLI method for clean file creation.
 - **Jinja Templating for Security:** Introduced Jinja syntax (`{{ env_var() }}`) within configuration files. This acts as a dynamic placeholder, allowing the pipeline to fetch secrets at runtime and immediately drop them, rather than violating Zero-Trust by hardcoding passwords.
 - **Architectural Efficiency (Direct Stage Querying):** Made an architectural decision to bypass the traditional `sources.yml` setup. Because Snowflake's engine is powerful enough to query compressed `.gz` files directly from an internal stage (`@raw_stage`), we can skip building intermediate Bronze tables entirely, optimizing both storage and compute.
+
+
+## Day 6: The Silver Layer (Staging)
+- **Goal:** Build the first transformational dbt model to clean raw Bronze data directly from the Snowflake stage.
+- **Actions:**
+    - Engineered a Snowflake `FILE FORMAT` to parse compressed `.csv.gz` files and automatically handle null string conversions.
+    - Wrote `stg_orders.sql`, querying directly from `@raw_stage` using positional `$1` selection and explicit type casting.
+    - Successfully materialized `SILVER.stg_orders` (99k+ rows) using the `-s` (select) flag in dbt.
+
+### ⚠️ Technical Challenges & Key Learnings
+- **RBAC Enforcement (Zero-Trust):** Encountered a `003001 (42501): SQL access control error`. Diagnosed this not as a code bug, but as the security architecture working correctly. `TRANSFORMER_ROLE` was blocked from creating tables until explicitly granted `ALL PRIVILEGES` on the `SILVER` schema by `ACCOUNTADMIN`.
+- **Snowflake Delimiter Strictness:** Learned that Snowflake's parser can conflict with itself if `RECORD_DELIMITER` is explicitly set to `\n` alongside `FIELD_DELIMITER`. Removed the redundant row delimiter to rely on Snowflake's default engine, resolving the `001019 (22023)` compilation error.
+- **dbt Pathing Automation:** Automated dbt's profile and project directory paths using `.env` variables (`DBT_PROFILES_DIR` and `DBT_PROJECT_DIR`) to cleanly eliminate repetitive CLI flags.
+- **Schema-on-Read Architecture:** Implemented a Schema-on-Read paradigm. Instead of forcing raw data into a rigid, pre-defined table beforehand (Schema-on-Write), the structural definition (column names and explicit data types) was applied dynamically at the exact moment the raw `.gz` file was queried from the stage.
+- **Common Table Expressions (CTEs):** Utilized the `WITH` clause to create modular, readable transformation logic. By staging the raw extraction in a temporary result set before executing the final `SELECT`, this established a clean, standard pattern for future complex transformations.
+- **Named Argument Syntax (`=>`):** Leveraged Snowflake's parameter passing syntax. Used the `=>` operator to explicitly bind the custom `FILE_FORMAT` ruleset to the stage query, guaranteeing the raw data was parsed precisely according to the engineered CSV rules.
