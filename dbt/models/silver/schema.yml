@@ -1,0 +1,23 @@
+version: 2
+
+models:
+  - name: stg_orders
+    description: "Cleaned and casted orders table from the raw Bronze stage."
+    columns:
+      - name: order_id
+        description: "Primary key for the order."
+        tests:
+          - unique
+          - not_null
+      
+      - name: customer_id
+        description: "Foreign key linking to the customer."
+        tests:
+          - not_null
+          
+      - name: order_status
+        description: "The current state of the order."
+        tests:
+          - accepted_values:
+              arguments:
+                values: ['delivered', 'shipped', 'canceled', 'unavailable', 'invoiced', 'processing', 'created', 'approved']

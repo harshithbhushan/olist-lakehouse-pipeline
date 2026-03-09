@@ -84,3 +84,19 @@
 - **Schema-on-Read Architecture:** Implemented a Schema-on-Read paradigm. Instead of forcing raw data into a rigid, pre-defined table beforehand (Schema-on-Write), the structural definition (column names and explicit data types) was applied dynamically at the exact moment the raw `.gz` file was queried from the stage.
 - **Common Table Expressions (CTEs):** Utilized the `WITH` clause to create modular, readable transformation logic. By staging the raw extraction in a temporary result set before executing the final `SELECT`, this established a clean, standard pattern for future complex transformations.
 - **Named Argument Syntax (`=>`):** Leveraged Snowflake's parameter passing syntax. Used the `=>` operator to explicitly bind the custom `FILE_FORMAT` ruleset to the stage query, guaranteeing the raw data was parsed precisely according to the engineered CSV rules.
+
+
+## Day 7: Data Quality & Testing
+- **Goal:** Implement automated data quality checks on the Silver layer to guarantee mathematical soundness for downstream ML models.
+- **Actions:**
+    - Engineered a `schema.yml` file within the Silver layer to define strict column-level data contracts.
+    - Implemented foundational dbt generic tests: `unique` (primary key validation), `not_null` (completeness), and `accepted_values` (business logic alignment).
+    - Executed the test suite against `stg_orders` (99k+ rows), successfully passing all constraints.
+
+### ⚠️ Technical Challenges & Key Learnings
+- **Data Contracts:** Solidified the concept that data pipelines require testing just like software. Silent data corruption is fatal to predictive modeling APIs. 
+- **YAML Syntax Upgrades:** Encountered a `MissingArgumentsPropertyInGenericTestDeprecation` warning. Learned to adapt to modern dbt architecture by nesting test parameters under the `arguments:` property to future-proof the codebase.
+- **Silent Data Failures vs. Software Crashes:** Recognized a core paradigm shift: while software bugs cause obvious application crashes, data pipeline bugs fail silently. Without testing, SQL will execute perfectly but pass mathematically poisoned data to the business.
+- **Architectural Constraint (Snowflake Primary Keys):** Discovered that cloud data warehouses like Snowflake do not natively enforce `PRIMARY KEY` constraints like traditional transactional databases (e.g., Postgres). Because the database will not reject duplicate inserts, dbt testing (`unique`, `not_null`) is mandatory to physically protect data integrity.
+- **Test Compilation Mechanics:** Solidified how dbt executes tests under the hood. It dynamically translates declarative YAML rules into raw SQL assertions (e.g., converting a `not_null` test into `SELECT * FROM table WHERE column IS NULL`). A test passes only if the compiled query returns exactly zero rows.
+- **YAML Structural Integrity:** Reinforced that YAML configuration files are strict mathematical data structures, not flexible text. Hyphens denote array elements, and explicit indentation defines logical scope; altering either will instantly crash the dbt compiler.
