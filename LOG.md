@@ -100,3 +100,22 @@
 - **Architectural Constraint (Snowflake Primary Keys):** Discovered that cloud data warehouses like Snowflake do not natively enforce `PRIMARY KEY` constraints like traditional transactional databases (e.g., Postgres). Because the database will not reject duplicate inserts, dbt testing (`unique`, `not_null`) is mandatory to physically protect data integrity.
 - **Test Compilation Mechanics:** Solidified how dbt executes tests under the hood. It dynamically translates declarative YAML rules into raw SQL assertions (e.g., converting a `not_null` test into `SELECT * FROM table WHERE column IS NULL`). A test passes only if the compiled query returns exactly zero rows.
 - **YAML Structural Integrity:** Reinforced that YAML configuration files are strict mathematical data structures, not flexible text. Hyphens denote array elements, and explicit indentation defines logical scope; altering either will instantly crash the dbt compiler.
+
+
+## Day 8: The Gold Layer Architecture & Silver Prerequisites
+- **Goal:** Design the Star Schema architecture (Gold Layer) and build the remaining prerequisite Silver staging tables to prepare for dimensional modeling.
+- **Actions:**
+    - Established the `gold` layer directory structure.
+    - Designed and materialized `stg_customers` (99k rows) and `stg_products` (32k rows) using Schema-on-Read directly from compressed stage files.
+    - Executed parallel processing via dbt (`dbt run -s stg_customers stg_products`), building independent models simultaneously to optimize pipeline speed.
+
+### 🏗️ Architectural Decisions & Key Learnings
+- **Star Schema Design (Nouns vs. Verbs):** Architected the Gold layer to separate Fact tables (the verbs/transactions) from Dimension tables (the nouns/context). This denormalization optimizes the data for rapid BI querying and ML ingestion.
+- **Data Type Consciousness:** Discovered that defaulting to `VARCHAR` during Schema-on-Read creates technical debt for downstream analytics. Intentionally cast physical measurements (weights, lengths) to `INTEGER` to enable mathematical aggregations for the predictive API.
+- **The Silver Philosophy (Chaos Absorption):** Identified and permanently corrected a source-system typo (`product_name_lenght`). Reinforced that the Silver layer's primary purpose is to protect the Gold layer from upstream formatting errors.
+- **Compute Optimization vs. Relational Drag:** Recognized that leaving the Silver layer highly normalized ("too relational") forces Snowflake to recalculate massive 5-table joins on every dashboard refresh, burning compute credits and slowing performance. The Star Schema solves this by restructuring data into highly optimized Facts (Verbs) and Dimensions (Nouns).
+- **Feeding the Machine Learning Layer:** Staging `dim_customers` and `dim_products` is a strict mathematical prerequisite for the End-to-End Retail Reorder Prediction & Customer Segmentation API. Clustering algorithms require geographic data (zip codes) to group behavior, and predictive models require product attributes (weights, dimensions) to calculate logistical constraints.
+- **DAGs & Parallel Execution:** Observed dbt's execution engine in action. Because `stg_customers` and `stg_products` have no dependencies on each other, dbt built them simultaneously using multiple threads. This parallel execution within the Directed Acyclic Graph (DAG) is what keeps pipelines fast as they scale.
+- **Data Type Traps & Formatting Strictness:** - **Zip Codes:** Intentionally cast as `VARCHAR`. If cast as integers, the database will strip leading zeros (e.g., `07030` becomes `7030`), permanently corrupting location data.
+    - **Syntax:** Maintained strict syntax for Snowflake parameters (e.g., ensuring `FILE_FORMAT` is exact and capitalizing parameters).
+    - **Readability:** Enforced vertical alignment for `SELECT`, `FROM`, and `WHERE` clauses. SQL engines do not care about indentation, but human engineers rely on it to instantly scan query structures.
