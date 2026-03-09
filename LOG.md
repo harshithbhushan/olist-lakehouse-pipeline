@@ -140,3 +140,16 @@
 - **Jinja Syntax Mastery:** Differentiated between Jinja's Logic Engine (`{% %}` for `if/else` loops and macros) and its Printer (`{{ }}` for outputting values) to manipulate SQL compilation dynamically.
 - **Project Configuration (`dbt_project.yml`):** Clarified the distinction between the project `name` (the internal namespace/codebase) and the `profile` (the security connection lock). Mastered the `+` operator to apply directory-level configuration rules (like `+schema: gold`).
 - **CLI Execution Mechanics:** Reinforced that `dbt test` audits data quality without building tables, while `dbt run` executes the DDL. Learned that the `-s` selection flag targets logical nodes in the DAG, meaning `.sql` file extensions must be omitted.
+
+
+## Phase 3: Orchestration (Apache Airflow)
+## Day 10: The Airflow Foundation
+- **Goal:** Establish a localized orchestration environment to automate the Data Lakehouse pipeline (Bronze ingestion + Silver/Gold transformations).
+- **Actions:**
+    - Fetched the official Apache Airflow `docker-compose.yaml` blueprint.
+    - Configured the environment parameters (`AIRFLOW_UID=50000`) to resolve Linux-to-Windows filesystem permission conflicts.
+    - Initialized the Airflow Postgres backend database and stood up the Webserver, Scheduler, and Worker containers in detached mode.
+
+### ⚠️ Technical Challenges & Key Learnings
+- **Containerized Orchestration:** Recognized that running pipelines manually is a liability. Stood up Airflow to act as the central control plane. 
+- **Infrastructure as Code (IaC):** Leveraged Docker Compose to build a complex, multi-node architecture (Database + Scheduler + Webserver) using a single YAML configuration file, avoiding manual software installations and dependency hell.
