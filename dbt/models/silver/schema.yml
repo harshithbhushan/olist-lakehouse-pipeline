@@ -21,3 +21,21 @@ models:
           - accepted_values:
               arguments:
                 values: ['delivered', 'shipped', 'canceled', 'unavailable', 'invoiced', 'processing', 'created', 'approved']
+
+  - name: stg_customers
+    description: "Cleaned customers table from the raw Bronze stage."
+    columns:
+      - name: customer_id
+        description: "Primary key for the customer."
+        tests:
+          - unique
+          - not_null
+
+  - name: stg_products
+    description: "Cleaned products table from the raw Bronze stage."
+    columns:
+      - name: product_id
+        description: "Primary key for the product."
+        tests:
+          - unique
+          - not_null
