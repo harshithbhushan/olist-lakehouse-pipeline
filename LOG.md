@@ -150,6 +150,6 @@
     - Configured the environment parameters (`AIRFLOW_UID=50000`) to resolve Linux-to-Windows filesystem permission conflicts.
     - Initialized the Airflow Postgres backend database and stood up the Webserver, Scheduler, and Worker containers in detached mode.
 
-### ⚠️ Technical Challenges & Key Learnings
+### 📑 Key Learnings
 - **Containerized Orchestration:** Recognized that running pipelines manually is a liability. Stood up Airflow to act as the central control plane. 
 - **Infrastructure as Code (IaC):** Leveraged Docker Compose to build a complex, multi-node architecture (Database + Scheduler + Webserver) using a single YAML configuration file, avoiding manual software installations and dependency hell.
