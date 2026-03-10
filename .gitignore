@@ -6,3 +6,11 @@ data/
 logs/
 # Virtual Environment
 venv/
+
+# Ignore dbt build artifacts
+dbt/target/
+dbt/dbt_packages/
+dbt/logs/
+
+# Ignore Airflow logs
+logs/

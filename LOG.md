@@ -155,7 +155,7 @@
 - **Infrastructure as Code (IaC):** Leveraged Docker Compose to build a complex, multi-node architecture (Database + Scheduler + Webserver) using a single YAML configuration file, avoiding manual software installations and dependency hell.
 
 
-## Day 11: The DAG (Directed Acyclic Graph)
+## Day 11 (Part-1): The DAG (Directed Acyclic Graph)
 - **Goal:** Architect the orchestration sequence to automate the Bronze ingestion and Silver/Gold transformations.
 - **Actions:**
     - Authored `lakehouse_pipeline.py` using the Airflow Python API.
@@ -166,3 +166,47 @@
 - **The DAG Concept:** Learned that a Directed Acyclic Graph ensures data flows in one direction. By strictly defining dependencies, Airflow automatically skips downstream transformations if upstream ingestion fails, protecting the Lakehouse from stale data.
 - **Idempotency & Catchup:** Explicitly set `catchup=False` to prevent Airflow from retroactively triggering hundreds of historical pipeline runs (which would burn Kaggle API limits and Snowflake compute credits).
 - **Environment Isolation:** Discovered that VS Code's local Python linter throws "unresolved import" errors for the `airflow` library because the library is installed securely inside the Docker container, not on the local Windows machine. Learned to rely on container execution rather than local execution.
+
+## Day 11 (Part-2): Orchestration & Docker Networking
+- **Goal:** Architect the Airflow DAG to automate the Lakehouse, bridge the Docker-to-Windows filesystem, and manage containerized dependencies.
+- **Actions:**
+    - Authored `lakehouse_pipeline.py` using the `BashOperator` to map the execution sequence (`ingest_bronze >> transform_lakehouse`).
+    - Configured Docker Volume Mapping in `docker-compose.yaml` to dynamically mirror local Windows scripts (`load_bronze.py`, `dbt/`, `.env`) directly into the isolated Linux Airflow Worker container.
+    - Explicitly configured `_PIP_ADDITIONAL_REQUIREMENTS` to install required execution tools on container boot.
+
+### 🏗️ Architectural Decisions & Key Learnings
+- **Version Pinning & Environment Parity:** Hardcoded `dbt-snowflake==1.11.3` into the Docker build to perfectly mirror the local development environment. Learned that Orchestration engines must never run floating or unpinned versions to prevent downstream code breakage.
+- **Semantic Versioning:** Explored the `Major.Minor.Patch` framework to understand how software upgrades dictate migration strategies rather than complete rewrites. 
+- **The DAG Concept:** Enforced a Directed Acyclic Graph architecture. By defining strict dependencies, Airflow automatically halts downstream transformations if upstream ingestion fails, mathematically protecting the Lakehouse from stale data.
+
+### ⚠️ Technical Challenges & Troubleshooting
+- **Dependency Hell & The Crash Loop:** Encountered a fatal container crash loop where the default Airflow image (running Python 3.8) failed to install modern dbt libraries (which require >=3.10.0). 
+- **The Fix:** Diagnosed the internal container logs using `docker logs`, bypassed the failing version, and explicitly commanded Docker to pull an upgraded base image (`apache/airflow:2.8.1-python3.11`) to satisfy the dependency matrix.
+
+## Day 11 (Part-3): Orchestration, Dependency Hell, & Docker File Systems
+- **Goal:** Architect the Airflow DAG to automate the Lakehouse, bridge the Docker-to-Windows filesystem, and manage containerized dependencies.
+- **Outcome:** Successfully achieved a fully automated "Double Green" execution state, successfully querying `OLIST_LAKEHOUSE.GOLD.DIM_CUSTOMERS`. Bypassed critical container crashes and dependency matrix conflicts.
+- **Actions:**
+    - Authored `lakehouse_pipeline.py` using the Airflow Python API and `BashOperator`.
+    - Mapped the execution sequence using the bit-shift dependency operator (`ingest_bronze >> transform_lakehouse`).
+    - Configured Docker Volume Mapping to dynamically mirror local Windows scripts directly into the isolated Linux container.
+
+### 🏗️ Architectural Decisions & Key Concepts
+- **Data Orchestration vs. CI/CD:** Clarified that Airflow orchestrates the flow of *data* (ETL), whereas CI/CD (like GitHub Actions) orchestrates the deployment of *code*.
+- **The DAG Concept:**  Learned that a Directed Acyclic Graph ensures data flows in one direction. By strictly defining dependencies, Airflow automatically skips downstream transformations if upstream ingestion fails, mathematically protecting the Lakehouse from stale data.
+- **Cron Scheduling & Idempotency:** Implemented the `@daily` Cron schedule (0 0 * * *) to automate pipeline execution. Explicitly set `catchup=False` to prevent Airflow from retroactively triggering historical runs, saving Kaggle API limits and Snowflake compute credits.
+- **Environment Isolation:** Discovered that local IDE linters throw "unresolved import" errors for containerized libraries. Learned to rely on container execution rather than local execution.
+- **Semantic Versioning & Parity:** Explored the `Major.Minor.Patch` framework. Hardcoded `dbt-snowflake==1.11.3` to guarantee environment parity between local development and the production Orchestration engine.
+- **The Engine Swap:** Re-architected the orchestration engine to use `LocalExecutor`, forcing the Airflow Scheduler to process tasks directly and bypassing distributed worker complexities for a single-node Lakehouse.
+
+### ⚠️ Technical Challenges & Chronological Troubleshooting
+We encountered and resolved a gauntlet of classic DevOps/Data Engineering failures in this exact order:
+
+1. **The Python Version Clash (Crash Loop):** - *Error:* `dbt-snowflake` required Python >=3.10, but the default Airflow 2.8.1 image used Python 3.8. Container crashed continuously.
+   - *Fix:* Bypassed the failing version and explicitly commanded Docker to pull an upgraded base image (`apache/airflow:2.8.1-python3.11`).
+2. **Transitive Dependency Hell (The `click` Conflict):** - *Error:* Unpinned background libraries automatically updated. `dbt` strictly required `click >= 8.3.0`, but the `celery` engine inside Airflow 2.8.1 fatally crashed (`NoneType object has no attribute 'split'`) when exposed to it. 
+   - *Fix:* Upgraded the entire cluster to Airflow `2.10.2` and dropped the Celery worker entirely (The Engine Swap).
+3. **The Docker Volume Phantom Folder (Errno 95):** - *Error:* Docker incorrectly mounted the local `load_bronze.py` script as an empty directory, causing Python to throw an `Operation not supported` OS error inside the container.
+   - *Fix:* Destroyed the phantom folder, moved the absolute files directly next to `docker-compose.yaml`, and hard-reset the cluster to flush the volume/inode cache.
+4. **The Missing dbt Profile & Pathing Conflicts:** - *Error:* Running `dbt` inside the Airflow container failed because it lacked the hidden Windows `profiles.yml` credentials, and the `.env` file passed conflicting relative directory paths.
+   - *Fix:* Relocated `profiles.yml` into the project directory for Docker to mount, and forcefully injected absolute paths via the CLI (`--project-dir /opt/airflow/dbt --profiles-dir /opt/airflow/dbt`).
