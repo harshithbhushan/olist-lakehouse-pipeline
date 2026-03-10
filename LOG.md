@@ -153,3 +153,16 @@
 ### 📑 Key Learnings
 - **Containerized Orchestration:** Recognized that running pipelines manually is a liability. Stood up Airflow to act as the central control plane. 
 - **Infrastructure as Code (IaC):** Leveraged Docker Compose to build a complex, multi-node architecture (Database + Scheduler + Webserver) using a single YAML configuration file, avoiding manual software installations and dependency hell.
+
+
+## Day 11: The DAG (Directed Acyclic Graph)
+- **Goal:** Architect the orchestration sequence to automate the Bronze ingestion and Silver/Gold transformations.
+- **Actions:**
+    - Authored `lakehouse_pipeline.py` using the Airflow Python API.
+    - Utilized the `BashOperator` to establish the task blueprint.
+    - Mapped the execution sequence using the bit-shift dependency operator (`task_1 >> task_2`).
+
+### 📑 Key Learnings
+- **The DAG Concept:** Learned that a Directed Acyclic Graph ensures data flows in one direction. By strictly defining dependencies, Airflow automatically skips downstream transformations if upstream ingestion fails, protecting the Lakehouse from stale data.
+- **Idempotency & Catchup:** Explicitly set `catchup=False` to prevent Airflow from retroactively triggering hundreds of historical pipeline runs (which would burn Kaggle API limits and Snowflake compute credits).
+- **Environment Isolation:** Discovered that VS Code's local Python linter throws "unresolved import" errors for the `airflow` library because the library is installed securely inside the Docker container, not on the local Windows machine. Learned to rely on container execution rather than local execution.
