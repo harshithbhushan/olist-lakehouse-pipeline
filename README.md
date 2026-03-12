@@ -11,23 +11,23 @@ The architecture is designed to bridge the gap between raw operational data and 
 
 ```mermaid
 flowchart LR
-    subgraph Data Source
+    subgraph Data_Source [Data Source]
         K[Kaggle: O-List Dataset]
     end
 
-    subgraph Docker Local Environment
+    subgraph Docker_Env [Docker Local Environment]
         A[Apache Airflow]
         D[dbt Core]
     end
 
-    subgraph Snowflake Cloud Lakehouse
+    subgraph Snowflake_Lakehouse [Snowflake Cloud Lakehouse]
         direction TB
-        B[(Bronze Layer<br>Raw Stage & CSV)]
-        S[(Silver Layer<br>Cleansed & Typed)]
-        G[(Gold Layer<br>Dimensional Models)]
+        B[(Bronze Layer: Raw Stage & CSV)]
+        S[(Silver Layer: Cleansed & Typed)]
+        G[(Gold Layer: Dimensional Models)]
     end
 
-    subgraph Presentation
+    subgraph Presentation_Layer [Presentation]
         T[Tableau / BI]
     end
 
@@ -36,16 +36,9 @@ flowchart LR
     B -->|dbt transformations| S
     S -->|dbt joins & aggregations| G
     A -.->|Orchestrates| D
-    D -.->|Compiles/Executes SQL| Snowflake Cloud Lakehouse
+    D -.->|Executes SQL| S
     G -->|Direct Query| T
 ```
-
-* **Orchestration:** Apache Airflow (Dockerized, `LocalExecutor`)
-* **Data Ingestion:** Python (Custom extraction and Snowflake `PUT` staging)
-* **Data Warehouse:** Snowflake (Medallion Architecture)
-* **Transformation:** dbt (data build tool)
-* **Infrastructure:** Docker Compose (Bridging Windows host to Linux containers)
-
 
 * **Orchestration:** Apache Airflow (Dockerized, `LocalExecutor`)
 * **Data Ingestion:** Python (Custom extraction and Snowflake `PUT` staging)
@@ -79,3 +72,18 @@ The ultimate goal of this Lakehouse is to answer critical business questions. Th
 * **Docker Volume Isolation:** Engineered precise volume mappings in `docker-compose.yaml` to allow the isolated Linux Airflow container to successfully locate and process raw CSV files stored on the Windows host machine.
 * **Silent Pipeline Failures:** Implemented strict error handling and logging to diagnose and fix a "Silent Success" where the ingestion script exited gracefully despite missing local data directories, ensuring true data idempotency.
 * **RBAC Security Management:** Applied the Principle of Least Privilege in Snowflake, transferring schema and object ownership from `ACCOUNTADMIN` to a dedicated `TRANSFORMER_ROLE` service account for automated pipeline execution.
+
+## 📊 Business Logic & Data Modeling (The "Why")
+
+The raw Brazilian E-Commerce dataset is heavily normalized across multiple transactional tables. While efficient for an application backend, it is highly inefficient for analytical queries. 
+
+I architected the **Gold Layer** using a Kimball-style Star Schema. By denormalizing the Silver layer into distinct Fact and Dimension tables, I optimized the Lakehouse for read-heavy BI workloads, ensuring Tableau dashboards load instantly. 
+
+Here is the strategic reasoning behind the Gold models:
+
+* **`DIM_CUSTOMERS`:** * **The Problem:** Customer location data was siloed in a separate geolocation table.
+  * **The Logic:** I joined the customer data with the geolocation dataset to create a single, enriched dimension. This allows business analysts to instantly segment users by state and zip code prefix without writing complex SQL joins, powering regional marketing campaigns.
+* **`DIM_PRODUCTS`:** * **The Problem:** Product category names were in Portuguese, and metrics like "name length" and "photo quantity" were buried.
+  * **The Logic:** I translated the categories to English and isolated the product attributes. This allows the business to analyze if richer product listings (more photos, longer descriptions) correlate with higher sales volume.
+* **`FACT_ORDERS`:** * **The Problem:** Order timestamps, item prices, and freight values were scattered across three different raw tables.
+  * **The Logic:** I centralized the quantitative metrics at the grain of an individual `order_item_id`. By calculating delivery duration (delivered date vs. estimated date), this Fact table serves as the central nervous system for measuring fulfillment efficiency and total revenue generation.
