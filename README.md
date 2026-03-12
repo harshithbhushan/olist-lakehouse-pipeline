@@ -9,6 +9,43 @@ The architecture is designed to bridge the gap between raw operational data and 
 
 ## 🏗️ Architecture & Stack
 
+```mermaid
+flowchart LR
+    subgraph Data Source
+        K[Kaggle: O-List Dataset]
+    end
+
+    subgraph Docker Local Environment
+        A[Apache Airflow]
+        D[dbt Core]
+    end
+
+    subgraph Snowflake Cloud Lakehouse
+        direction TB
+        B[(Bronze Layer<br>Raw Stage & CSV)]
+        S[(Silver Layer<br>Cleansed & Typed)]
+        G[(Gold Layer<br>Dimensional Models)]
+    end
+
+    subgraph Presentation
+        T[Tableau / BI]
+    end
+
+    K -->|Python Extractor| A
+    A -->|PUT Command| B
+    B -->|dbt transformations| S
+    S -->|dbt joins & aggregations| G
+    A -.->|Orchestrates| D
+    D -.->|Compiles/Executes SQL| Snowflake Cloud Lakehouse
+    G -->|Direct Query| T
+```
+
+* **Orchestration:** Apache Airflow (Dockerized, `LocalExecutor`)
+* **Data Ingestion:** Python (Custom extraction and Snowflake `PUT` staging)
+* **Data Warehouse:** Snowflake (Medallion Architecture)
+* **Transformation:** dbt (data build tool)
+* **Infrastructure:** Docker Compose (Bridging Windows host to Linux containers)
+
 
 * **Orchestration:** Apache Airflow (Dockerized, `LocalExecutor`)
 * **Data Ingestion:** Python (Custom extraction and Snowflake `PUT` staging)
