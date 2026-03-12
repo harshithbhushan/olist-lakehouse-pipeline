@@ -210,3 +210,25 @@ We encountered and resolved a gauntlet of classic DevOps/Data Engineering failur
    - *Fix:* Destroyed the phantom folder, moved the absolute files directly next to `docker-compose.yaml`, and hard-reset the cluster to flush the volume/inode cache.
 4. **The Missing dbt Profile & Pathing Conflicts:** - *Error:* Running `dbt` inside the Airflow container failed because it lacked the hidden Windows `profiles.yml` credentials, and the `.env` file passed conflicting relative directory paths.
    - *Fix:* Relocated `profiles.yml` into the project directory for Docker to mount, and forcefully injected absolute paths via the CLI (`--project-dir /opt/airflow/dbt --profiles-dir /opt/airflow/dbt`).
+
+
+## Day 12: QA, The "Silent Success", & Docker Volume Mapping
+- **Goal:** Execute a full "Nuke & Rebuild" to prove pipeline resilience, troubleshoot data ingestion failures, and finalize the Docker-to-Windows filesystem bridge.
+- **Outcome:** Successfully simulated a total environment loss, patched a critical Docker networking blindspot, and automated the recovery of the entire Lakehouse, ending with a fully populated Gold layer.
+- **Actions:**
+    - Executed `DROP SCHEMA ... CASCADE` to intentionally destroy the Bronze, Silver, and Gold layers.
+    - Re-architected `docker-compose.yaml` to include explicit volume mapping for the `data` directory (`- ${AIRFLOW_PROJ_DIR:-.}/data:/opt/airflow/data`).
+    - Authored a recovery SQL script to safely rebuild the environment, explicitly transferring ownership back to `TRANSFORMER_ROLE` before recreating the internal `RAW_STAGE` and `CSV_FORMAT`.
+    - Captured a real-time screen recording of the Airflow DAG autonomously rebuilding the data warehouse.
+
+### 🏗️ Architectural Decisions & Key Concepts
+- **The "Silent Success" Trap:** Discovered that orchestrators like Airflow determine success based purely on system exit codes. Because the Python ingestion script safely handled a missing directory error (Exit Code 0), Airflow falsely marked the task as successful even though 0 rows were pushed. 
+- **Docker Volume Isolation:**  Reaffirmed that containers operate in strict isolation. Even if a folder exists on the local Windows host, the Linux container is completely blind to it unless a specific "window" is mapped in the compose file.
+- **The Blast Radius of CASCADE:** Learned that running `DROP SCHEMA ... CASCADE` doesn't just drop tables; it vaporizes critical internal infrastructure, including custom File Formats and Stages required by the ELT pipeline. 
+
+### ⚠️ Technical Challenges & Troubleshooting
+- **The Phantom Data Folder:** *Error:* `load_bronze.py` ran flawlessly but pushed no data to Snowflake. 
+  - *Diagnosis:* Read the internal container logs and found `[Errno 2] No such file or directory: './data'`. The Python script was looking for the Kaggle CSVs, but the container couldn't see the Windows folder.
+  - *Fix:* Added the volume mount to `docker-compose.yaml`, ran a hard cluster reset (`docker compose down` then `up -d`), and forced the container to read the local host files.
+- **The Missing Landing Pad:** *Error:* After nuking the schemas, dbt failed with `Stage 'RAW_STAGE' does not exist or not authorized.`
+  - *Fix:* Realized the `CASCADE` command destroyed the landing pad. Wrote a SQL recovery block to recreate `RAW_STAGE` and the custom `CSV_FORMAT` under the correct Service Role (`TRANSFORMER_ROLE`) before triggering the DAG.
